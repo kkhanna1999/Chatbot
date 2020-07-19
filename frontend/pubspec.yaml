@@ -30,6 +30,8 @@ dependencies:
   flutter_dialogflow: ^0.1.2 
   shared_preferences: ^0.5.7+3
   url_launcher: ^5.5.0
+  image_picker:
+  fluttertoast: ^7.0.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

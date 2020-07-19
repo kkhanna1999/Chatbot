@@ -5,9 +5,13 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 List<ChatMessage> messages = <ChatMessage>[];
 int mailAlert = 0;
+File imageFile; // to capture image
+int checkImage = 0; // to see if user have uploaded some image or not;
 
 class HomePageDialogflow extends StatefulWidget {
   HomePageDialogflow({Key key, this.title}) : super(key: key);
@@ -21,7 +25,6 @@ class HomePageDialogflow extends StatefulWidget {
 class _HomePageDialogflow extends State<HomePageDialogflow> {
   final TextEditingController _textController = new TextEditingController();
   Widget _buildTextComposer() {
-    print(mailAlert);
     return new IconTheme(
       data: new IconThemeData(color: Colors.green[400]),
       child: new Container(
@@ -44,20 +47,122 @@ class _HomePageDialogflow extends State<HomePageDialogflow> {
                       controller: _textController,
                       onSubmitted: handleSubmitted,
                       decoration: new InputDecoration.collapsed(
-                          hintText:
-                              "Say Hey or greet to start/Restart conversation"),
+                          hintText: "Type your message ....."),
                     ),
                   ),
             new Container(
               margin: new EdgeInsets.symmetric(horizontal: 4.0),
               child: new IconButton(
+                icon: new Icon(Icons.image),
+                onPressed: () {
+                  _showSelectionDialog(context);
+                },
+              ),
+            ),
+            new Container(
+              margin: new EdgeInsets.symmetric(horizontal: 4.0),
+              child: new IconButton(
                   icon: new Icon(Icons.send),
-                  onPressed: () => handleSubmitted(_textController.text)),
+                  onPressed: () {
+                    _textController.text != ""
+                        ? handleSubmitted(_textController.text)
+                        : _emptyText(
+                            context); // when user tries to send empty message it won't allow you.
+                  }),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _emptyText(BuildContext context) {
+    return showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text("Please Enter some text"),
+          );
+        });
+  }
+
+  //dialogbox to give user an option for selecting an image from gallery or to click image
+  Future<void> _showSelectionDialog(BuildContext context) {
+    return showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+              title: Text("From where do you want to take the photo?"),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: <Widget>[
+                    GestureDetector(
+                      child: Text("Gallery"),
+                      onTap: () {
+                        _openGallery(context);
+                      },
+                    ),
+                    Padding(padding: EdgeInsets.all(8.0)),
+                    GestureDetector(
+                      child: Text("Camera"),
+                      onTap: () {
+                        _openCamera(context);
+                      },
+                    )
+                  ],
+                ),
+              ));
+        });
+  }
+
+  Widget _setImageView() {
+    return new Container(
+      width: 200,
+      height: 150,
+      decoration: new BoxDecoration(
+        image: DecorationImage(
+          image: FileImage(imageFile),
+          fit: BoxFit.fill,
+        ),
+      ),
+    );
+  }
+
+// openst the gallery
+  void _openGallery(BuildContext context) async {
+    checkImage = 1;
+    var picture = await ImagePicker().getImage(source: ImageSource.gallery);
+    imageFile = File(picture.path);
+    // dummy messagae of an image
+    ChatMessage message = new ChatMessage(
+      text: "Image",
+      name: "User",
+      type: true,
+      imageWidget: _setImageView(),
+    );
+    setState(() {
+      Response("Image");
+      messages.insert(0, message);
+    });
+    Navigator.of(context).pop();
+  }
+
+// Opens the camera.
+  void _openCamera(BuildContext context) async {
+    checkImage = 1;
+    var picture = await ImagePicker().getImage(source: ImageSource.camera);
+    imageFile = File(picture.path);
+    ChatMessage message = new ChatMessage(
+      text: "Image",
+      name: "User",
+      type: true,
+      imageWidget: _setImageView(),
+    );
+    setState(() {
+      Response("Image");
+      messages.insert(0, message);
+    });
+    Navigator.of(context).pop();
   }
 
   Future<http.Response> addMail(String email) async {
@@ -84,7 +189,6 @@ class _HomePageDialogflow extends State<HomePageDialogflow> {
     // print('Here');
     if (regExp.hasMatch(query) == true) {
       mailAlert = 1;
-      print('matched');
       await addMail(query); // call to backend to store email address
       // call Api to add mail in backend.
     }
@@ -98,6 +202,7 @@ class _HomePageDialogflow extends State<HomePageDialogflow> {
     var botsuggestion = BotSuggestions(response.getListMessage());
     var botimages = BotImages(response.getListMessage());
     var botinformation = BotInfo(response.getListMessage());
+    var botLink = BotLink(response.getListMessage());
     // print(botsuggestion.suggestions);
     // print(botimages.images);
     // print(botinformation.info);
@@ -109,6 +214,8 @@ class _HomePageDialogflow extends State<HomePageDialogflow> {
       options: botsuggestion.suggestions,
       imageOptions: botimages.images,
       botInfo: botinformation.info,
+      botLink: botLink.links,
+      handleSubmitted: handleSubmitted,
     );
     setState(() {
       messages.insert(0, message);
@@ -117,13 +224,14 @@ class _HomePageDialogflow extends State<HomePageDialogflow> {
 
   // to handle text submitted by user.
   void handleSubmitted(String text) {
+    checkImage = 0;
     _textController.clear();
     ChatMessage message = new ChatMessage(
       text: text,
       name: "User",
       type: true,
     );
-    // again ans again building the pge
+    // again and again building the pge
     // to show the message from bot and user
     setState(() {
       messages.insert(0, message);
@@ -132,47 +240,93 @@ class _HomePageDialogflow extends State<HomePageDialogflow> {
   }
 
   @override
+  // for start to start the conversation
+  // Greeting message from bot.
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Response("hey");
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return new Scaffold(
-      appBar: new AppBar(
-        backgroundColor: Colors.green[400],
-        centerTitle: true,
-        title: Row(
-          children: <Widget>[
-            new Container(
-              margin: const EdgeInsets.only(right: 16.0),
-              child: new CircleAvatar(
-                child: new Image.asset(
-                  // images are being saved on machine fetching it from networks takes time.
-                  "assets/images/bot.jpg",
-                  width: 29,
-                  height: 29,
-                ),
-                backgroundColor: Colors.white,
+    print(messages);
+    // Checks if we alreay have some conversation or not?
+    return messages.length != 0
+        ? Scaffold(
+            appBar: new AppBar(
+              backgroundColor: Colors.green[400],
+              centerTitle: true,
+              title: Row(
+                children: <Widget>[
+                  new Container(
+                    margin: const EdgeInsets.only(right: 16.0),
+                    child: new CircleAvatar(
+                      child: new Image.asset(
+                        // images are being saved on machine fetching it from networks takes time.
+                        "assets/images/bot.jpg",
+                        width: 29,
+                        height: 29,
+                      ),
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                  new Text(
+                    "Hi! This is your assistant bot Billy",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
-            new Text(
-              "Hi! This is your assistant bot Billy",
-              style: TextStyle(fontWeight: FontWeight.bold),
+            body: new Column(children: <Widget>[
+              new Flexible(
+                  child: new ListView.builder(
+                padding: new EdgeInsets.all(8.0),
+                reverse: true,
+                itemBuilder: (_, int index) => messages[index],
+                itemCount: messages.length,
+              )),
+              new Divider(height: 1.0),
+              new Container(
+                decoration:
+                    new BoxDecoration(color: Theme.of(context).cardColor),
+                child: _buildTextComposer(),
+              ),
+            ]),
+          )
+        : new Scaffold(
+            appBar: new AppBar(
+              backgroundColor: Colors.green[400],
+              centerTitle: true,
+              title: Row(
+                children: <Widget>[
+                  new Container(
+                    margin: const EdgeInsets.only(right: 16.0),
+                    child: new CircleAvatar(
+                      child: new Image.asset(
+                        // images are being saved on machine fetching it from networks takes time.
+                        "assets/images/bot.jpg",
+                        width: 29,
+                        height: 29,
+                      ),
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                  new Text(
+                    "Hi! This is your assistant bot Billy",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
-      body: new Column(children: <Widget>[
-        new Flexible(
-            child: new ListView.builder(
-          padding: new EdgeInsets.all(8.0),
-          reverse: true,
-          itemBuilder: (_, int index) => messages[index],
-          itemCount: messages.length,
-        )),
-        new Divider(height: 1.0),
-        new Container(
-          decoration: new BoxDecoration(color: Theme.of(context).cardColor),
-          child: _buildTextComposer(),
-        ),
-      ]),
-    );
+            body: Center(
+              child: CircularProgressIndicator(
+                // loading untill the greeting message is ready.
+                backgroundColor: Colors.green[400],
+              ),
+            ),
+          );
   }
 }
 
@@ -185,7 +339,9 @@ class ChatMessage extends StatefulWidget {
       this.options,
       this.imageOptions,
       this.botInfo,
-      this.botLink});
+      this.botLink,
+      this.handleSubmitted,
+      this.imageWidget});
 
   final String text;
   final String name;
@@ -194,48 +350,15 @@ class ChatMessage extends StatefulWidget {
   final List imageOptions;
   final List botInfo;
   final List botLink;
+  final Function handleSubmitted;
+  final Widget imageWidget;
   @override
   _ChatMessageState createState() => _ChatMessageState();
 }
 
 class _ChatMessageState extends State<ChatMessage> {
   // handle submission by clicked on the option buttons given.
-  void handleSubmitted(String text) async {
-    print(text);
-    ChatMessage message = new ChatMessage(
-      text: text,
-      name: "User",
-      type: true,
-    );
-    messages.insert(0, message);
-    AuthGoogle authGoogle =
-        await AuthGoogle(fileJson: "assets/credentials.json")
-            .build(); // crenditial auth
-    Dialogflow dialogflow =
-        Dialogflow(authGoogle: authGoogle, language: Language.english);
-    AIResponse response =
-        await dialogflow.detectIntent(text); // Api call to dialogflow
-    var botsuggestion = BotSuggestions(
-        response.getListMessage()); //get list of options user can have
-    var botimages = BotImages(response.getListMessage()); // get list of images
-    var botinformation = BotInfo(response
-        .getListMessage()); // get list of additonal text apart from response
-    var botlink = BotLink(response.getListMessage());
-    print(response.getListMessage());
-    print(botinformation.info);
-    print(botlink.links);
-    ChatMessage message1 = new ChatMessage(
-      text: response.getMessage() ??
-          new CardDialogflow(response.getListMessage()[0]).title,
-      name: "Bot",
-      type: false,
-      options: botsuggestion.suggestions,
-      imageOptions: botimages.images,
-      botInfo: botinformation.info,
-      botLink: botlink.links,
-    );
-    messages.insert(0, message1);
-  }
+  HomePageDialogflow obj = new HomePageDialogflow();
 
 // handels formating of bots message.
   List<Widget> otherMessage(context) {
@@ -366,14 +489,9 @@ class _ChatMessageState extends State<ChatMessage> {
                         onTap: () async {
                           // making function to wait untill it completes the response of particular phrase
                           // so that screen doesnt refresh without a response.
-                          await handleSubmitted(widget.options[index]);
+                          this.widget.handleSubmitted(widget.options[index]);
                           // building the page again after the response has been fetche
                           // building here will just change the pixels which are rest page remains same.
-                          Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => HomePageDialogflow()),
-                              (route) => false);
                         },
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(0, 5, 0, 3),
@@ -422,11 +540,16 @@ class _ChatMessageState extends State<ChatMessage> {
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: new Text(
-                  this.widget.text,
+                  this.widget.text != "" ? this.widget.text : "No text",
                   style: TextStyle(fontSize: 15),
                 ),
               ),
             ),
+            widget.imageWidget != null
+                ? widget.imageWidget
+                : SizedBox(
+                    height: 1,
+                  )
           ],
         ),
       ),
