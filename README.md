@@ -1,5 +1,5 @@
 
-# SmartBot - Efficient ChatBot built with Google's Dialogflow(Conversational AI)
+# SmartBot - Efficient ChatBot built with Google's Dialogflow 
 ## Overview:- 
 
 A Flutter based Mobile Application which is capable of responding to user's message for some initial Phrases, To make bot conversation interesting it is capable of responding back with images/gifs , links etc.The bot can receive image from user and further image classification is under progress. An API call is being made at the end to store the users email address for further communication.
